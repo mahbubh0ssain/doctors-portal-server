@@ -5,6 +5,8 @@ const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
 require("dotenv").config();
 
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 //middle-wares
 app.use(express.json());
 app.use(cors());
@@ -52,6 +54,35 @@ const DoctorsCollection = client
   .db("DoctorsPortal")
   .collection("doctorsCollection");
 
+// payments collection
+const PaymentCollection = client
+  .db("DoctorsPortal")
+  .collection("paymentCollection");
+
+// post payment info
+app.post("/paymentInfo", async (req, res) => {
+  const info = req.body;
+  const result = await PaymentCollection.insertOne(info);
+
+  // const id = { _id: ObjectId(info.bookingId) };
+  const update = {
+    $set: {
+      paid: true,
+    },
+  };
+
+  const bookingUpdate = await BookingCollections.updateOne(
+    { _id: ObjectId(info.bookingId) },
+    update,
+    {
+      upsert: true,
+    }
+  );
+
+  res.send(result);
+});
+
+// verifyAdmin
 const verifyAdmin = async (req, res, next) => {
   const decodedEmail = req.decoded.email;
   const query = { email: decodedEmail };
@@ -117,10 +148,12 @@ app.get("/appointmentOptions", async (req, res) => {
 // });
 
 //get specialty
+
 app.get("/specialty", async (req, res) => {
   const result = await Appointments.find({}).project({ name: 1 }).toArray();
   res.send(result);
 });
+
 // verify JWT
 const veriFyJWT = (req, res, next) => {
   const headerToken = req.headers.authorization;
@@ -136,6 +169,25 @@ const veriFyJWT = (req, res, next) => {
     next();
   });
 };
+
+// create payment intent
+app.post("/create-payment-intent", async (req, res) => {
+  const price = req.body.price;
+  // console.log(req.body);
+  // const booking = req.body;
+  // const price = booking.price;
+  const amount = price * 100;
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency: "usd",
+    payment_method_types: ["card"],
+  });
+
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
+});
 
 //get booking
 app.get("/booking", veriFyJWT, async (req, res) => {

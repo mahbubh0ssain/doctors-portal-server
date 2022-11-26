@@ -1,7 +1,6 @@
 {
   "name": "doctors-portal-server",
   "version": "1.0.0",
-  "description": "",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -15,6 +14,16 @@
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "jsonwebtoken": "^8.5.1",
-    "mongodb": "^4.11.0"
-  }
+    "mongodb": "^4.12.0",
+    "stripe": "^11.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mahbubh0ssain/doctors-portal-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mahbubh0ssain/doctors-portal-server/issues"
+  },
+  "homepage": "https://github.com/mahbubh0ssain/doctors-portal-server#readme",
+  "description": ""
 }
