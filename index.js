@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const nodemailer = require("nodemailer");
+const mg = require("nodemailer-mailgun-transport");
 const app = express();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
@@ -33,6 +35,43 @@ const run = async () => {
   }
 };
 run();
+
+//send booking email function
+const sendBookingEmail = (bookingInfo) => {
+  const { email, treatmentName, selectedDate, slot } = bookingInfo;
+
+  const auth = {
+    auth: {
+      api_key: process.env.API_KEY,
+      domain: process.env.EMAIL_SENDER_DOMAIN,
+    },
+  };
+
+  const transporter = nodemailer.createTransport(mg(auth));
+
+  transporter.sendMail(
+    {
+      from: "mahbubh0ssain.dev@gmail.com", // sender address
+      to: email,
+      subject: `Your appointment for ${treatmentName} is confirmed.`,
+      text: "Hello!", // plain text body
+      html: `
+    <h3>Your appointment is confirmed</h3>
+    <div>
+    <p>Please visit us at ${selectedDate} at ${slot} </p>
+    <p>Thanks from Doctor's Portal</p>
+    </div>
+    `,
+    },
+    (error, info) => {
+      if (error) {
+        console.log(error);
+      } else {
+        console.log(`Response: ${info.response}`);
+      }
+    }
+  );
+};
 
 //appointments
 const Appointments = client
@@ -236,6 +275,8 @@ app.post("/bookings", async (req, res) => {
     const result = await BookingCollections.insertOne(bookingInfo);
 
     if (result?.acknowledged) {
+      // send email about booking confirmation
+      sendBookingEmail(bookingInfo);
       res.send({
         success: true,
         data: result,
