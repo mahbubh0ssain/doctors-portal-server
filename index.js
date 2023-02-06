@@ -1,3 +1,10 @@
+require("dotenv").config();
+const {
+  MongoClient,
+  ServerApiVersion,
+  ObjectId,
+  CURSOR_FLAGS,
+} = require("mongodb");
 const express = require("express");
 const cors = require("cors");
 const nodemailer = require("nodemailer");
@@ -5,7 +12,6 @@ const mg = require("nodemailer-mailgun-transport");
 const app = express();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
-require("dotenv").config();
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -18,7 +24,7 @@ app.get("/", (req, res) => {
 });
 
 //DB client
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+
 const uri = `mongodb+srv://${process.env.DB_NAME}:${process.env.DB_PASSWORD}@doctorsportal.qodli8f.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   useNewUrlParser: true,
@@ -39,8 +45,8 @@ run();
 //send booking email function
 const sendBookingEmail = (bookingInfo) => {
   const { email, treatmentName, selectedDate, slot } = bookingInfo;
-
   const auth = {
+    //mailgun er kaj karbar koresi ekhane
     auth: {
       api_key: process.env.API_KEY,
       domain: process.env.EMAIL_SENDER_DOMAIN,
@@ -102,14 +108,11 @@ const PaymentCollection = client
 app.post("/paymentInfo", async (req, res) => {
   const info = req.body;
   const result = await PaymentCollection.insertOne(info);
-
-  // const id = { _id: ObjectId(info.bookingId) };
   const update = {
     $set: {
       paid: true,
     },
   };
-
   const bookingUpdate = await BookingCollections.updateOne(
     { _id: ObjectId(info.bookingId) },
     update,
@@ -117,7 +120,6 @@ app.post("/paymentInfo", async (req, res) => {
       upsert: true,
     }
   );
-
   res.send(result);
 });
 
@@ -177,15 +179,6 @@ app.get("/appointmentOptions", async (req, res) => {
   }
 });
 
-// //get price after production setup . this is bangla system of adding something after site run
-// app.get("/addPrice", async (req, res) => {
-//   const update = { $set: { price: 90 } };
-//   const result = await Appointments.updateMany({}, update, {
-//     upsert: true,
-//   });
-//   res.send(result);
-// });
-
 //get specialty
 
 app.get("/specialty", async (req, res) => {
@@ -196,13 +189,15 @@ app.get("/specialty", async (req, res) => {
 // verify JWT
 const veriFyJWT = (req, res, next) => {
   const headerToken = req.headers.authorization;
+  console.log(headerToken);
   if (!headerToken) {
     return res.status(401).send({ message: "Unauthorized access." });
   }
   const token = headerToken.split(" ")[1];
+  console.log(token);
   jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
     if (err) {
-      return res.status(403).send({ message: "Access forbidden" });
+      return res.status(403).send({ message: "Access Forbidden" });
     }
     req.decoded = decoded;
     next();
@@ -212,17 +207,12 @@ const veriFyJWT = (req, res, next) => {
 // create payment intent
 app.post("/create-payment-intent", async (req, res) => {
   const price = req.body.price;
-  // console.log(req.body);
-  // const booking = req.body;
-  // const price = booking.price;
   const amount = price * 100;
-
   const paymentIntent = await stripe.paymentIntents.create({
     amount,
     currency: "usd",
     payment_method_types: ["card"],
   });
-
   res.send({
     clientSecret: paymentIntent.client_secret,
   });
@@ -236,9 +226,7 @@ app.get("/booking", veriFyJWT, async (req, res) => {
     if (email !== decodedEmail) {
       return res.status(403).send({ message: "Access forbidden" });
     }
-    const query = { email: email };
-
-    const result = await BookingCollections.find(query).toArray();
+    const result = await BookingCollections.find({ email: email }).toArray();
     res.send(result);
   } catch (err) {
     console.error(err);
@@ -256,13 +244,11 @@ app.get("/bookings/:id", async (req, res) => {
 app.post("/bookings", async (req, res) => {
   try {
     const bookingInfo = req.body;
-
     const query = {
       selectedDate: bookingInfo.selectedDate,
       email: bookingInfo.email,
       treatmentName: bookingInfo.treatmentName,
     };
-
     const alreadyBooked = await BookingCollections.find(query).toArray();
     if (alreadyBooked.length) {
       res.send({
@@ -271,9 +257,7 @@ app.post("/bookings", async (req, res) => {
       });
       return;
     }
-
     const result = await BookingCollections.insertOne(bookingInfo);
-
     if (result?.acknowledged) {
       // send email about booking confirmation
       sendBookingEmail(bookingInfo);
@@ -298,6 +282,10 @@ app.post("/bookings", async (req, res) => {
 //post users
 app.post("/users", async (req, res) => {
   const user = req.body;
+  const isExist = await UsersCollection.findOne({ email: user?.email });
+  if (isExist) {
+    return;
+  }
   const result = await UsersCollection.insertOne(user);
   res.send(result);
 });
@@ -313,9 +301,7 @@ app.get("/jwt", async (req, res) => {
   const email = req.query.email;
   const isExist = await UsersCollection.findOne({ email: email });
   if (isExist) {
-    const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, {
-      expiresIn: "20h",
-    });
+    const token = jwt.sign({ email }, process.env.ACCESS_TOKEN);
     return res.send({ token });
   }
   return res.status(401).send({ message: "Access forbidden." });
