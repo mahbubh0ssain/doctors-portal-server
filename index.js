@@ -189,12 +189,10 @@ app.get("/specialty", async (req, res) => {
 // verify JWT
 const veriFyJWT = (req, res, next) => {
   const headerToken = req.headers.authorization;
-  console.log(headerToken);
   if (!headerToken) {
     return res.status(401).send({ message: "Unauthorized access." });
   }
   const token = headerToken.split(" ")[1];
-  console.log(token);
   jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
     if (err) {
       return res.status(403).send({ message: "Access Forbidden" });
